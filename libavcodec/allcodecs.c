@@ -786,6 +786,7 @@ extern const FFCodec ff_libopus_encoder;
 extern const FFCodec ff_libopus_decoder;
 extern const FFCodec ff_librav1e_encoder;
 extern const FFCodec ff_librsvg_decoder;
+extern const FFCodec ff_libasvg_decoder;
 extern const FFCodec ff_libshine_encoder;
 extern const FFCodec ff_libspeex_encoder;
 extern const FFCodec ff_libspeex_decoder;

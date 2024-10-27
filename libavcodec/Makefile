@@ -711,6 +711,7 @@ OBJS-$(CONFIG_SUBVIEWER_DECODER)       += subviewerdec.o ass.o
 OBJS-$(CONFIG_SUNRAST_DECODER)         += sunrast.o
 OBJS-$(CONFIG_SUNRAST_ENCODER)         += sunrastenc.o
 OBJS-$(CONFIG_LIBRSVG_DECODER)         += librsvgdec.o
+OBJS-$(CONFIG_LIBASVG_DECODER)         += libasvgdec.o
 OBJS-$(CONFIG_SBC_DECODER)             += sbcdec.o sbcdec_data.o sbc.o
 OBJS-$(CONFIG_SBC_ENCODER)             += sbcenc.o sbc.o sbcdsp.o sbcdsp_data.o
 OBJS-$(CONFIG_SVQ1_DECODER)            += svq1dec.o svq1.o h263data.o

@@ -29,7 +29,6 @@
 
 #include "config_components.h"
 
-#include "libavformat/http.h"
 #include "libavutil/aes.h"
 #include "libavutil/avstring.h"
 #include "libavutil/avassert.h"
@@ -626,23 +625,6 @@ static int ensure_playlist(HLSContext *c, struct playlist **pls, const char *url
     return 0;
 }
 
-static int open_url_keepalive(AVFormatContext *s, AVIOContext **pb,
-                              const char *url, AVDictionary **options)
-{
-#if !CONFIG_HTTP_PROTOCOL
-    return AVERROR_PROTOCOL_NOT_FOUND;
-#else
-    int ret;
-    URLContext *uc = ffio_geturlcontext(*pb);
-    av_assert0(uc);
-    (*pb)->eof_reached = 0;
-    ret = ff_http_do_new_request2(uc, url, options);
-    if (ret < 0) {
-        ff_format_io_close(s, pb);
-    }
-    return ret;
-#endif
-}
 
 static int open_url(AVFormatContext *s, AVIOContext **pb, const char *url,
                     AVDictionary **opts, AVDictionary *opts2, int *is_http_out)
@@ -695,23 +677,9 @@ static int open_url(AVFormatContext *s, AVIOContext **pb, const char *url,
     av_dict_copy(&tmp, *opts, 0);
     av_dict_copy(&tmp, opts2, 0);
 
-    if (is_http && c->http_persistent && *pb) {
-        ret = open_url_keepalive(c->ctx, pb, url, &tmp);
-        if (ret == AVERROR_EXIT) {
-            av_dict_free(&tmp);
-            return ret;
-        } else if (ret < 0) {
-            if (ret != AVERROR_EOF)
-                av_log(s, AV_LOG_WARNING,
-                    "keepalive request failed for '%s' with error: '%s' when opening url, retrying with new connection\n",
-                    url, av_err2str(ret));
-            av_dict_copy(&tmp, *opts, 0);
-            av_dict_copy(&tmp, opts2, 0);
-            ret = s->io_open(s, pb, url, AVIO_FLAG_READ, &tmp);
-        }
-    } else {
-        ret = s->io_open(s, pb, url, AVIO_FLAG_READ, &tmp);
-    }
+
+    ret = s->io_open(s, pb, url, AVIO_FLAG_READ, &tmp);
+
     if (ret >= 0) {
         // update cookies on http response with setcookies.
         char *new_cookies = NULL;
@@ -754,19 +722,6 @@ static int parse_playlist(HLSContext *c, const char *url,
     int prev_n_segments = 0;
     int64_t prev_start_seq_no = -1;
 
-    if (is_http && !in && c->http_persistent && c->playlist_pb) {
-        in = c->playlist_pb;
-        ret = open_url_keepalive(c->ctx, &c->playlist_pb, url, NULL);
-        if (ret == AVERROR_EXIT) {
-            return ret;
-        } else if (ret < 0) {
-            if (ret != AVERROR_EOF)
-                av_log(c->ctx, AV_LOG_WARNING,
-                    "keepalive request failed for '%s' with error: '%s' when parsing playlist\n",
-                    url, av_err2str(ret));
-            in = NULL;
-        }
-    }
 
     if (!in) {
         AVDictionary *opts = NULL;

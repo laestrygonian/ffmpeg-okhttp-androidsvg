@@ -3778,7 +3778,7 @@ http_protocol_select="tcp_protocol"
 http_protocol_suggest="zlib"
 httpproxy_protocol_select="tcp_protocol"
 httpproxy_protocol_suggest="zlib"
-https_protocol_select="tls_protocol"
+# https_protocol_select="tls_protocol"
 https_protocol_suggest="zlib"
 icecast_protocol_select="http_protocol"
 mmsh_protocol_select="http_protocol"
@@ -3812,6 +3812,8 @@ unix_protocol_deps="sys_un_h"
 unix_protocol_select="network"
 ipfs_gateway_protocol_select="https_protocol"
 ipns_gateway_protocol_select="https_protocol"
+http_protocol_deps="jni"
+
 
 # external library protocols
 libamqp_protocol_deps="librabbitmq"
@@ -6682,7 +6684,7 @@ check_lib ole32    "windows.h objbase.h"  CoTaskMemFree        -lole32
 check_lib shell32  "windows.h shellapi.h" CommandLineToArgvW   -lshell32
 check_lib psapi    "windows.h psapi.h"    GetProcessMemoryInfo -lpsapi
 
-check_lib android android/native_window.h ANativeWindow_acquire -landroid
+check_lib android android/native_window.h ANativeWindow_acquire -landroid -ljnigraphics
 check_lib mediandk "stdint.h media/NdkMediaFormat.h" AMediaFormat_new -lmediandk
 check_lib camera2ndk "stdbool.h stdint.h camera/NdkCameraManager.h" ACameraManager_create -lcamera2ndk
 

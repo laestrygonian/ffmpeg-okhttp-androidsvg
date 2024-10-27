@@ -156,6 +156,8 @@ int avcodec_parameters_from_context(AVCodecParameters *par,
         par->format              = codec->pix_fmt;
         par->width               = codec->width;
         par->height              = codec->height;
+        par->coded_width         = codec->coded_width;
+        par->coded_height        = codec->coded_height;
         par->field_order         = codec->field_order;
         par->color_range         = codec->color_range;
         par->color_primaries     = codec->color_primaries;
@@ -220,6 +222,8 @@ int avcodec_parameters_to_context(AVCodecContext *codec,
         codec->pix_fmt                = par->format;
         codec->width                  = par->width;
         codec->height                 = par->height;
+        codec->coded_width            = par->coded_width;
+        codec->coded_height           = par->coded_height;
         codec->field_order            = par->field_order;
         codec->color_range            = par->color_range;
         codec->color_primaries        = par->color_primaries;

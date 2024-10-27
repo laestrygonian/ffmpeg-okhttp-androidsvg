@@ -805,8 +805,10 @@ static int resolve_content_path(AVFormatContext *s, const char *url, int *max_ur
                 memset(p + 1, 0, strlen(p));
             }
             av_strlcat(tmp_str, text + start, tmp_max_url_size);
-            xmlNodeSetContent(baseurl_nodes[i], tmp_str);
+            xmlChar *escaped = xmlEncodeSpecialChars(NULL, tmp_str);
+            xmlNodeSetContent(baseurl_nodes[i], escaped);
             updated = 1;
+            xmlFree(escaped);
             xmlFree(text);
         }
     }
@@ -1221,6 +1223,7 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
     uint32_t period_duration_sec = 0;
     uint32_t period_start_sec = 0;
 
+
     if (!in) {
         close_in = 1;
 
@@ -1235,6 +1238,7 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
         c->base_url = av_strdup(url);
 
     av_bprint_init(&buf, 0, INT_MAX); // xmlReadMemory uses integer bufsize
+
 
     if ((ret = avio_read_to_bprint(in, &buf, SIZE_MAX)) < 0 ||
         !avio_feof(in)) {
@@ -1362,7 +1366,6 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
 cleanup:
         /*free the document */
         xmlFreeDoc(doc);
-        xmlCleanupParser();
         xmlFreeNode(mpd_baseurl_node);
     }
 
@@ -1932,33 +1935,37 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
     int i;
 
     pls->parent = s;
-    pls->cur_seq_no  = calc_cur_seg_no(s, pls);
+    pls->cur_seq_no = calc_cur_seg_no(s, pls);
 
-    if (!pls->last_seq_no) {
+    if (!pls->last_seq_no)
         pls->last_seq_no = calc_max_seg_no(pls, s->priv_data);
-    }
+
 
     ret = reopen_demux_for_component(s, pls);
-    if (ret < 0) {
-        goto fail;
-    }
+
+    if (ret < 0)
+        return ret;
+
     for (i = 0; i < pls->ctx->nb_streams; i++) {
         AVStream *st = avformat_new_stream(s, NULL);
         AVStream *ist = pls->ctx->streams[i];
-        if (!st) {
-            ret = AVERROR(ENOMEM);
-            goto fail;
-        }
+
+        if (!st)
+            return AVERROR(ENOMEM);
+
         st->id = i;
-        avcodec_parameters_copy(st->codecpar, ist->codecpar);
+
+        ret = avcodec_parameters_copy(st->codecpar, ist->codecpar);
+
+        if(ret <0 )
+             return ret;
+
         avpriv_set_pts_info(st, ist->pts_wrap_bits, ist->time_base.num, ist->time_base.den);
 
         // copy disposition
         st->disposition = ist->disposition;
     }
 
-    return 0;
-fail:
     return ret;
 }
 

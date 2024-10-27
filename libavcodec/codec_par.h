@@ -135,6 +135,15 @@ typedef struct AVCodecParameters {
     int height;
 
     /**
+     * Video only. The dimensions of the coded video frame in pixels.
+     *
+     */
+    int coded_width;
+    int coded_height;
+
+    /**
+
+    /**
      * Video only. The aspect ratio (width / height) which a single pixel
      * should have when displayed.
      *
