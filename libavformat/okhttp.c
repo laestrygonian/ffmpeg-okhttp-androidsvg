@@ -43,6 +43,8 @@ struct JNIOkhttpFields {
 
     jmethodID okhttp_close_method;
 
+    jmethodID okhttp_get_mime_method;
+
 };
 
 
@@ -54,6 +56,7 @@ static const struct FFJniField jfields_okhttp_mapping[] = {
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpRead", "([BI)I", FF_JNI_METHOD, OFFSET(okhttp_read_method), 1 },
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpSeek", "(JI)J", FF_JNI_METHOD, OFFSET(okhttp_seek_method), 1 },
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpClose", "()V", FF_JNI_METHOD, OFFSET(okhttp_close_method), 1 },
+        { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpGetMime", "()Ljava/lang/String;", FF_JNI_METHOD, OFFSET(okhttp_get_mime_method), 1 },
     { NULL }
 };
 #undef OFFSET
@@ -62,6 +65,8 @@ typedef struct {
     const AVClass *class;
 
     char *headers;
+
+    char *mime_type;
 
     struct JNIOkhttpFields jfields;
 
@@ -78,6 +83,7 @@ typedef struct {
 
 static const AVOption options[] = {
     { "headers", "set custom HTTP headers, can override built in default headers", OFFSET(headers), AV_OPT_TYPE_STRING, { .str = NULL }, 0, 0, D | E },
+    { "mime_type", "export the MIME type", OFFSET(mime_type), AV_OPT_TYPE_STRING, { .str = NULL }, 0, 0, AV_OPT_FLAG_EXPORT | AV_OPT_FLAG_READONLY },
     { NULL }
 };
 #undef OFFSET
@@ -130,8 +136,11 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
     jobject object = NULL;
     jobject url = NULL;
     jobject headers = NULL;
+    jobject mime_type = NULL;
     jbyteArray array = NULL;
     int ret = 0;
+
+    av_log(c, AV_LOG_DEBUG, "okhttp_open\n");
 
     av_jni_get_java_vm(h);
 
@@ -139,6 +148,12 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
 
     if (!env) {
         return AVERROR(EINVAL);
+    }
+
+    if (ff_check_interrupt(&h->interrupt_callback)){
+        av_log(c, AV_LOG_DEBUG, "okhttp_open interrupt\n");
+        ret = AVERROR_EXIT;
+        goto done;
     }
 
     ret = ff_jni_init_jfields(env, &c->jfields, jfields_okhttp_mapping, 1, c);
@@ -191,12 +206,34 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
         goto done;
     }
 
+    if (ff_check_interrupt(&h->interrupt_callback)){
+        av_log(c, AV_LOG_DEBUG, "okhttp_open interrupt\n");
+        ret = AVERROR_EXIT;
+        goto done;
+    }
+
 
     ret = (*env)->CallIntMethod(env, c->thiz, c->jfields.okhttp_open_method);
 
     if(ret) {
         ret = AVERROR_EXTERNAL;
         goto done;
+    }
+
+
+    if (ff_check_interrupt(&h->interrupt_callback)){
+        av_log(c, AV_LOG_DEBUG, "okhttp_open interrupt\n");
+        ret = AVERROR_EXIT;
+        goto done;
+    }
+
+
+    mime_type = (*env)->CallObjectMethod(env, c->thiz, c->jfields.okhttp_get_mime_method);
+
+    if(mime_type != NULL){
+        const char *m = (*env)->GetStringUTFChars(env,mime_type, NULL);
+        c->mime_type = av_strdup(m);
+        (*env)->ReleaseStringUTFChars(env, mime_type, m);
     }
 
     done:
@@ -208,6 +245,7 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
 
     (*env)->DeleteLocalRef(env, array);
     (*env)->DeleteLocalRef(env, object);
+    (*env)->DeleteLocalRef(env, mime_type);
     (*env)->DeleteLocalRef(env, url);
     (*env)->DeleteLocalRef(env, headers);
 
@@ -232,6 +270,7 @@ static int okhttp_read(URLContext *h, unsigned char *buf, int size)
         return AVERROR(EINVAL);
     }
 
+
     if (ff_check_interrupt(&h->interrupt_callback)) {
         av_log(c, AV_LOG_ERROR, "okhttp_read interrupt callback\n");
         return AVERROR_EXIT;
@@ -247,7 +286,7 @@ static int okhttp_read(URLContext *h, unsigned char *buf, int size)
 
     if (ff_jni_exception_check(env, 1, c->thiz) < 0) {
         av_log(c, AV_LOG_ERROR, "okhttp_read, bytes_read exception\n");
-        bytes_read = 0;
+        return AVERROR(EINVAL);
     }
 
     av_log(c, AV_LOG_DEBUG, "okhttp_read, bytes_read: %ld\n", bytes_read);
@@ -285,7 +324,7 @@ static int64_t okhttp_seek(URLContext *h, int64_t off, int whence)
                                            c->jfields.okhttp_seek_method, off, whence);
 
     if (ff_jni_exception_check(env, 1, c->thiz) < 0) {
-        result = AVERROR_EOF;
+        return AVERROR(EINVAL);
     }
 
 
