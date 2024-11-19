@@ -735,10 +735,7 @@ static int parse_playlist(HLSContext *c, const char *url,
         if (ret < 0)
             return ret;
 
-        if (is_http && c->http_persistent)
-            c->playlist_pb = in;
-        else
-            close_in = 1;
+        close_in = 1;
     }
 
     if (av_opt_get(in, "location", AV_OPT_SEARCH_CHILDREN, &new_url) >= 0)

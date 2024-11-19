@@ -45,18 +45,27 @@ struct JNIOkhttpFields {
 
     jmethodID okhttp_get_mime_method;
 
+    jclass hash_map_class;
+
+    jmethodID hash_map_init_method;
+
+    jmethodID hash_map_put_method;
+
 };
 
 
 #define OFFSET(x) offsetof(struct JNIOkhttpFields, x)
 static const struct FFJniField jfields_okhttp_mapping[] = {
-    { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", NULL, NULL, FF_JNI_CLASS, OFFSET(okhttp_class), 1 },
+        { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", NULL, NULL, FF_JNI_CLASS, OFFSET(okhttp_class), 1 },
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "<init>", "(Ljava/lang/String;Ljava/lang/String;)V", FF_JNI_METHOD, OFFSET(init_method), 1 },
-        { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpOpen", "()I", FF_JNI_METHOD, OFFSET(okhttp_open_method), 1 },
+        { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpOpen", "(Ljava/util/Map;)I", FF_JNI_METHOD, OFFSET(okhttp_open_method), 1 },
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpRead", "([BI)I", FF_JNI_METHOD, OFFSET(okhttp_read_method), 1 },
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpSeek", "(JI)J", FF_JNI_METHOD, OFFSET(okhttp_seek_method), 1 },
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpClose", "()V", FF_JNI_METHOD, OFFSET(okhttp_close_method), 1 },
         { "com/solarized/firedown/ffmpegutils/FFmpegOkhttp", "okhttpGetMime", "()Ljava/lang/String;", FF_JNI_METHOD, OFFSET(okhttp_get_mime_method), 1 },
+        { "java/util/HashMap", NULL, NULL, FF_JNI_CLASS, OFFSET(hash_map_class), 1 },
+        { "java/util/HashMap", "<init>", "()V", FF_JNI_METHOD, OFFSET(hash_map_init_method), 1 },
+        { "java/util/HashMap", "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", FF_JNI_METHOD, OFFSET(hash_map_put_method), 1 },
     { NULL }
 };
 #undef OFFSET
@@ -88,8 +97,71 @@ static const AVOption options[] = {
 };
 #undef OFFSET
 
-
 #define SEGMENT_SIZE 8192
+
+static jobject okhttp_get_options(OkhttpContext *c, JNIEnv *env, AVDictionary **options)
+{
+    jobject meta_map = NULL;
+    AVDictionaryEntry *t = NULL;
+    jobject key = NULL;
+    jobject value = NULL;
+    jobject previous = NULL;
+
+    meta_map = (*env)->NewObject(env, c->jfields.hash_map_class, c->jfields.hash_map_init_method);
+
+    if((*env)->ExceptionCheck(env) || meta_map == NULL){
+        goto end;
+    }
+
+
+    while ((t = av_dict_iterate(*options, t))) {
+
+         //av_log(c, AV_LOG_DEBUG, "okhttp_open entry %s value %s\n", t->key, t->value);
+
+         if(t != NULL){
+
+             key = ff_jni_utf_chars_to_jstring(env, t->key, c);
+             value = ff_jni_utf_chars_to_jstring(env, t->value, c);
+
+             if(key != NULL && value != NULL){
+
+                 previous = (*env)->CallObjectMethod(env, meta_map, c->jfields.hash_map_put_method, key, value);
+
+                 if (previous != NULL) {
+                     (*env)->DeleteLocalRef(env, previous);
+                 }
+
+             }
+
+             if(key != NULL){
+                (*env)->DeleteLocalRef(env, key);
+                key = NULL;
+             }
+             if(value != NULL){
+                (*env)->DeleteLocalRef(env, value);
+                value = NULL;
+             }
+
+         }
+
+    }
+
+
+    end:
+
+    if(key != NULL){
+        (*env)->DeleteLocalRef(env, key);
+    }
+
+    if(value != NULL){
+        (*env)->DeleteLocalRef(env, value);
+    }
+
+
+    return meta_map;
+
+
+}
 
 static int okhttp_close(URLContext *h)
 {
@@ -97,7 +169,7 @@ static int okhttp_close(URLContext *h)
     JNIEnv *env = NULL;
     int ret = 0;
 
-    av_log(c, AV_LOG_DEBUG, "okhttp_close\n");
+    //av_log(c, AV_LOG_DEBUG, "okhttp_close\n");
 
     if (!c->thiz || !c->jarray) {
         return 0;
@@ -129,7 +201,7 @@ static int okhttp_close(URLContext *h)
 }
 
 
-static int okhttp_open(URLContext *h, const char *uri, int flags)
+static int okhttp_open(URLContext *h, const char *uri, int flags, AVDictionary **options)
 {
     OkhttpContext *c = h->priv_data;
     JNIEnv *env = NULL;
@@ -137,10 +209,12 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
     jobject url = NULL;
     jobject headers = NULL;
     jobject mime_type = NULL;
+    jobject meta_map = NULL;
     jbyteArray array = NULL;
     int ret = 0;
 
-    av_log(c, AV_LOG_DEBUG, "okhttp_open\n");
+    //av_log(c, AV_LOG_DEBUG, "okhttp_open\n");
+
 
     av_jni_get_java_vm(h);
 
@@ -178,7 +252,8 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
         goto done;
     }
 
-    object = (*env)->NewObject(env, c->jfields.okhttp_class, c->jfields.init_method, url, headers);
+
+    object = (*env)->NewObject(env, c->jfields.okhttp_class, c->jfields.init_method, url, headers, meta_map);
 
     if (!object) {
         ret = AVERROR_EXTERNAL;
@@ -212,8 +287,9 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
         goto done;
     }
 
+    meta_map = okhttp_get_options(c, env, options);
 
-    ret = (*env)->CallIntMethod(env, c->thiz, c->jfields.okhttp_open_method);
+    ret = (*env)->CallIntMethod(env, c->thiz, c->jfields.okhttp_open_method, meta_map);
 
     if(ret) {
         ret = AVERROR_EXTERNAL;
@@ -243,6 +319,7 @@ static int okhttp_open(URLContext *h, const char *uri, int flags)
         (*env)->DeleteGlobalRef(env, c->thiz);
     }
 
+    (*env)->DeleteLocalRef(env, meta_map);
     (*env)->DeleteLocalRef(env, array);
     (*env)->DeleteLocalRef(env, object);
     (*env)->DeleteLocalRef(env, mime_type);
@@ -262,7 +339,7 @@ static int okhttp_read(URLContext *h, unsigned char *buf, int size)
     int buffer_size = 0;
 
 
-    av_log(c, AV_LOG_DEBUG, "okhttp_read size: %d\n", size);
+    //av_log(c, AV_LOG_DEBUG, "okhttp_read size: %d\n", size);
 
     env = ff_jni_get_env(h);
 
@@ -289,7 +366,7 @@ static int okhttp_read(URLContext *h, unsigned char *buf, int size)
         return AVERROR(EINVAL);
     }
 
-    av_log(c, AV_LOG_DEBUG, "okhttp_read, bytes_read: %ld\n", bytes_read);
+    //av_log(c, AV_LOG_DEBUG, "okhttp_read, bytes_read: %d\n", bytes_read);
 
 
     if(bytes_read > 0) {
@@ -298,7 +375,7 @@ static int okhttp_read(URLContext *h, unsigned char *buf, int size)
 
     }
 
-    av_log(c, AV_LOG_DEBUG, "okhttp_read, bytes_read result: %d\n", bytes_read ? bytes_read : AVERROR_EOF);
+    //av_log(c, AV_LOG_DEBUG, "okhttp_read, bytes_read result: %d\n", bytes_read ? bytes_read : AVERROR_EOF);
 
     return bytes_read ? bytes_read : AVERROR_EOF;
 }
@@ -316,7 +393,7 @@ static int64_t okhttp_seek(URLContext *h, int64_t off, int whence)
     }
 
     if (ff_check_interrupt(&h->interrupt_callback)) {
-        av_log(c, AV_LOG_DEBUG, "okhttp_read callback: %d\n", h->interrupt_callback);
+        av_log(c, AV_LOG_DEBUG, "okhttp_read callback \n");
         return AVERROR_EXIT;
     }
 
@@ -331,7 +408,7 @@ static int64_t okhttp_seek(URLContext *h, int64_t off, int whence)
     if(result < 0)
         result = AVERROR_EOF;
 
-    av_log(c, AV_LOG_DEBUG, "okhttp_seek %ld\n", result);
+    //av_log(c, AV_LOG_DEBUG, "okhttp_seek %ld\n", result);
 
     return result;
 
@@ -347,7 +424,7 @@ static const AVClass okhttp_context_class = {
 
 const URLProtocol ff_http_protocol = {
     .name                = "http",
-    .url_open            = okhttp_open,
+    .url_open2           = okhttp_open,
     .url_read            = okhttp_read,
     .url_seek            = okhttp_seek,
     .url_close           = okhttp_close,
@@ -359,7 +436,7 @@ const URLProtocol ff_http_protocol = {
 
 const URLProtocol ff_https_protocol = {
     .name                = "https",
-    .url_open            = okhttp_open,
+    .url_open2           = okhttp_open,
     .url_read            = okhttp_read,
     .url_seek            = okhttp_seek,
     .url_close           = okhttp_close,
