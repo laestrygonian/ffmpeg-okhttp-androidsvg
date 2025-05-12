@@ -1228,7 +1228,7 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
         close_in = 1;
 
         av_dict_copy(&opts, c->avio_opts, 0);
-        ret = avio_open2(&in, url, AVIO_FLAG_READ, c->interrupt_callback, &opts);
+        ret = ffio_open_whitelist(&in, url, AVIO_FLAG_READ, c->interrupt_callback, &opts, s->protocol_whitelist, s->protocol_blacklist);
         av_dict_free(&opts);
         if (ret < 0)
             return ret;
@@ -1242,6 +1242,8 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
 
     if ((ret = avio_read_to_bprint(in, &buf, SIZE_MAX)) < 0 ||
         !avio_feof(in)) {
+        av_log(s, AV_LOG_ERROR, "Unable to read ret '%d'\n", ret);
+        av_log(s, AV_LOG_ERROR, "Unable to read avio_feof '%d'\n", avio_feof(in));
         av_log(s, AV_LOG_ERROR, "Unable to read to manifest '%s'\n", url);
         if (ret == 0)
             ret = AVERROR_INVALIDDATA;
@@ -1822,6 +1824,7 @@ restart:
         goto end;
     }
     ret = read_from_url(v, v->cur_seg, buf, buf_size);
+
     if (ret > 0)
         goto end;
 

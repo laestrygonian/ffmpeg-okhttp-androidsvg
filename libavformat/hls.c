@@ -2485,17 +2485,32 @@ static int hls_probe(const AVProbeData *p)
 {
     /* Require #EXTM3U at the start, and either one of the ones below
      * somewhere for a proper match. */
-    if (strncmp(p->buf, "#EXTM3U", 7))
+
+    //av_log(NULL, AV_LOG_WARNING, "buff %s\n", p->buf);
+
+    //av_log(NULL, AV_LOG_WARNING, "buff strncmp %d\n", strncmp(p->buf, "#EXTM3U", 7));
+
+    //av_log(NULL, AV_LOG_WARNING, "p->mime_type %s\n", p->mime_type);
+
+    if (strncmp(p->buf, "#EXTM3U", 7)){
         return 0;
+    }
 
     if (strstr(p->buf, "#EXT-X-STREAM-INF:")     ||
         strstr(p->buf, "#EXT-X-TARGETDURATION:") ||
         strstr(p->buf, "#EXT-X-MEDIA-SEQUENCE:")) {
 
+         int mime_txt = p->mime_type && !(
+            av_strcasecmp(p->mime_type, "text/plain") &&
+            av_strcasecmp(p->mime_type, "text/html")
+            );
+
         int mime_ok = p->mime_type && !(
             av_strcasecmp(p->mime_type, "application/vnd.apple.mpegurl") &&
             av_strcasecmp(p->mime_type, "audio/mpegurl")
             );
+
+       // av_log(NULL, AV_LOG_WARNING, "mime_ok %d\n", mime_ok);
 
         int mime_x = p->mime_type && !(
             av_strcasecmp(p->mime_type, "audio/x-mpegurl") &&
@@ -2503,12 +2518,14 @@ static int hls_probe(const AVProbeData *p)
             );
 
         if (!mime_ok &&
-            !mime_x &&
+            !mime_x && !mime_txt &&
             !av_match_ext    (p->filename, "m3u8,m3u") &&
              ff_match_url_ext(p->filename, "m3u8,m3u") <= 0) {
             av_log(NULL, AV_LOG_ERROR, "Not detecting m3u8/hls with non standard extension and non standard mime type\n");
             return 0;
         }
+
+
         if (mime_x)
             av_log(NULL, AV_LOG_WARNING, "mime type is not rfc8216 compliant\n");
 

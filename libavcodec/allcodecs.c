@@ -803,8 +803,9 @@ extern FFCodec ff_libvpx_vp9_encoder;
 extern const FFCodec ff_libvpx_vp9_decoder;
 extern const FFCodec ff_libvvenc_encoder;
 /* preferred over libwebp */
-extern const FFCodec ff_libwebp_anim_encoder;
 extern const FFCodec ff_libwebp_encoder;
+extern const FFCodec ff_libwebp_anim_encoder;
+extern const FFCodec ff_libwebp_decoder;
 extern const FFCodec ff_libx262_encoder;
 extern const FFCodec ff_libx264_encoder;
 extern const FFCodec ff_libx264rgb_encoder;

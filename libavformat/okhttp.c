@@ -375,9 +375,10 @@ static int okhttp_read(URLContext *h, unsigned char *buf, int size)
 
     }
 
-    //av_log(c, AV_LOG_DEBUG, "okhttp_read, bytes_read result: %d\n", bytes_read ? bytes_read : AVERROR_EOF);
+    av_log(c, AV_LOG_DEBUG, "okhttp_read, bytes_read result: %d\n", bytes_read > 0 ? bytes_read : AVERROR_EOF);
 
-    return bytes_read ? bytes_read : AVERROR_EOF;
+
+    return bytes_read > 0 ? bytes_read : AVERROR_EOF;
 }
 
 static int64_t okhttp_seek(URLContext *h, int64_t off, int whence)
