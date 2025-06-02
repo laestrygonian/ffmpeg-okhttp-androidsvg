@@ -291,8 +291,8 @@ static int okhttp_open(URLContext *h, const char *uri, int flags, AVDictionary *
 
     ret = (*env)->CallIntMethod(env, c->thiz, c->jfields.okhttp_open_method, meta_map);
 
-    if(ret) {
-        ret = AVERROR_EXTERNAL;
+    if(ret < 0) {
+        ret = AVERROR(EINVAL);
         goto done;
     }
 
@@ -313,11 +313,6 @@ static int okhttp_open(URLContext *h, const char *uri, int flags, AVDictionary *
     }
 
     done:
-
-    if(ret < 0) {
-        ff_jni_reset_jfields(env, &c->jfields, jfields_okhttp_mapping, 1, c);
-        (*env)->DeleteGlobalRef(env, c->thiz);
-    }
 
     (*env)->DeleteLocalRef(env, meta_map);
     (*env)->DeleteLocalRef(env, array);
@@ -415,25 +410,23 @@ static int64_t okhttp_seek(URLContext *h, int64_t off, int whence)
 
 }
 
+// static const AVClass okhttp_context_class = {
+//     .class_name = "okhttp",
+//     .item_name  = av_default_item_name,
+//     .option     = options,
+//     .version    = LIBAVUTIL_VERSION_INT,
+// };
 
-static const AVClass okhttp_context_class = {
-    .class_name = "okhttp",
-    .item_name  = av_default_item_name,
-    .option     = options,
-    .version    = LIBAVUTIL_VERSION_INT,
-};
+#define HTTP_CLASS(flavor)                          \
+static const AVClass flavor ## _context_class = {   \
+    .class_name = # flavor,                         \
+    .item_name  = av_default_item_name,             \
+    .option     = options,                          \
+    .version    = LIBAVUTIL_VERSION_INT,            \
+}
 
-const URLProtocol ff_http_protocol = {
-    .name                = "http",
-    .url_open2           = okhttp_open,
-    .url_read            = okhttp_read,
-    .url_seek            = okhttp_seek,
-    .url_close           = okhttp_close,
-    .priv_data_size      = sizeof(OkhttpContext),
-    .priv_data_class     = &okhttp_context_class,
-    .flags               = URL_PROTOCOL_FLAG_NETWORK,
-    .default_whitelist   = "http,https,tls,tcp,udp,crypto"
-};
+#if CONFIG_HTTPS_PROTOCOL
+HTTP_CLASS(https);
 
 const URLProtocol ff_https_protocol = {
     .name                = "https",
@@ -444,5 +437,26 @@ const URLProtocol ff_https_protocol = {
     .priv_data_size      = sizeof(OkhttpContext),
     .priv_data_class     = &okhttp_context_class,
     .flags               = URL_PROTOCOL_FLAG_NETWORK,
-    .default_whitelist   = "http,https,tls,tcp,udp,crypto"
+    .default_whitelist   = "http,https,tls,tcp,udp,crypto,data"
 };
+
+#endif /* CONFIG_HTTPS_PROTOCOL */
+
+#if CONFIG_HTTP_PROTOCOL
+HTTP_CLASS(http);
+
+const URLProtocol ff_http_protocol = {
+    .name                = "http",
+    .url_open2           = okhttp_open,
+    .url_read            = okhttp_read,
+    .url_seek            = okhttp_seek,
+    .url_close           = okhttp_close,
+    .priv_data_size      = sizeof(OkhttpContext),
+    .priv_data_class     = &okhttp_context_class,
+    .flags               = URL_PROTOCOL_FLAG_NETWORK,
+    .default_whitelist   = "http,https,tls,tcp,udp,crypto,data"
+};
+
+#endif /* CONFIG_HTTP_PROTOCOL */
+
+
