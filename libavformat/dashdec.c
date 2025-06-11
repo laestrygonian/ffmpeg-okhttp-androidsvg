@@ -606,8 +606,8 @@ static int parse_manifest_segmenturlnode(AVFormatContext *s, struct representati
     char *initialization_val = NULL;
     char *media_val = NULL;
     char *range_val = NULL;
-    int max_url_size = c ? c->max_url_size: MAX_URL_SIZE;
     int err;
+    int max_url_size;
 
     if (!av_strcasecmp(fragmenturl_node->name, "Initialization")) {
         initialization_val = xmlGetProp(fragmenturl_node, "sourceURL");
@@ -620,6 +620,11 @@ static int parse_manifest_segmenturlnode(AVFormatContext *s, struct representati
                 xmlFree(initialization_val);
                 return AVERROR(ENOMEM);
             }
+            max_url_size = FFMAX(c ? c->max_url_size : 0,
+                                 aligned(strlen(initialization_val) +
+                                 (rep_id_val ? strlen(rep_id_val) : 0) +
+                                 (rep_bandwidth_val ? strlen(rep_bandwidth_val) :0)));
+            max_url_size = max_url_size ? max_url_size : MAX_URL_SIZE;
             rep->init_section->url = get_content_url(baseurl_nodes, 4,
                                                      max_url_size,
                                                      rep_id_val,
@@ -641,6 +646,11 @@ static int parse_manifest_segmenturlnode(AVFormatContext *s, struct representati
                 xmlFree(media_val);
                 return AVERROR(ENOMEM);
             }
+            max_url_size = FFMAX(c ? c->max_url_size : 0,
+                                     aligned(strlen(media_val) +
+                                     (rep_id_val ? strlen(rep_id_val) : 0) +
+                                     (rep_bandwidth_val ? strlen(rep_bandwidth_val) :0)));
+            max_url_size = max_url_size ? max_url_size : MAX_URL_SIZE;
             seg->url = get_content_url(baseurl_nodes, 4,
                                        max_url_size,
                                        rep_id_val,
