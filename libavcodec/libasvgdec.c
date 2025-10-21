@@ -1,6 +1,6 @@
 /*
  * Librsvg rasterization wrapper
- * Copyright (c) 2017 Rostislav Pehlivanov <atomnuker@gmail.com>
+ * Copyright (c) 2025 Pablo Navarro <pablo@solarized.dev>
  *
  * This file is part of FFmpeg.
  *
